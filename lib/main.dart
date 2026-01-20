@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'models/note.dart';
 import 'widgets/note_card.dart';
+import 'screens/note_detail_screen.dart';
 
 void main() {
   runApp(const KeepCloneApp());
@@ -104,7 +105,18 @@ class _NotesScreenState extends State<NotesScreen> {
           ),
           itemCount: dummyNotes.length,
           itemBuilder: (context, index) {
-            return NoteCard(note: dummyNotes[index]);
+            final note = dummyNotes[index];
+            return NoteCard(
+              note: note,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => NoteDetailScreen(note: note),
+                  ),
+                );
+              },
+            );
           },
         ),
       ),
