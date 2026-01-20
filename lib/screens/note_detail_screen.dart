@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import '../models/note.dart';
+import '../services/database_helper.dart';
 
 class NoteDetailScreen extends StatefulWidget {
   final Note note;
+  final bool isNew;
 
   const NoteDetailScreen({
     Key? key,
     required this.note,
+    this.isNew = false,
   }) : super(key: key);
 
   @override
@@ -16,6 +19,7 @@ class NoteDetailScreen extends StatefulWidget {
 class _NoteDetailScreenState extends State<NoteDetailScreen> {
   late TextEditingController _titleController;
   late TextEditingController _contentController;
+  bool _isDeleting = false;
 
   @override
   void initState() {
@@ -31,10 +35,51 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
     super.dispose();
   }
 
+  Future<void> _saveNote() async {
+    if (_isDeleting) return;
+
+    final title = _titleController.text.trim();
+    final content = _contentController.text.trim();
+
+    if (title.isEmpty && content.isEmpty) {
+      if (!widget.isNew) {
+        await DatabaseHelper.instance.deleteNote(widget.note.id);
+      }
+      return;
+    }
+
+    final note = widget.note.copyWith(
+      title: title,
+      content: content,
+      createdAt: DateTime.now(),
+    );
+
+    if (widget.isNew) {
+      await DatabaseHelper.instance.insertNote(note);
+    } else {
+      await DatabaseHelper.instance.updateNote(note);
+    }
+  }
+
+  Future<void> _deleteNote() async {
+    _isDeleting = true;
+    if (!widget.isNew) {
+      await DatabaseHelper.instance.deleteNote(widget.note.id);
+    }
+    if (mounted) {
+      Navigator.pop(context);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Color(widget.note.color),
+    return WillPopScope(
+      onWillPop: () async {
+        await _saveNote();
+        return true;
+      },
+      child: Scaffold(
+        backgroundColor: Color(widget.note.color),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -86,7 +131,20 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
               style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
             ),
             const Spacer(),
-            IconButton(icon: const Icon(Icons.more_vert), onPressed: () {}),
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              onSelected: (value) {
+                if (value == 'delete') {
+                  _deleteNote();
+                }
+              },
+              itemBuilder: (BuildContext context) => [
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Text('Delete'),
+                ),
+              ],
+            ),
           ],
         ),
       ),
