@@ -19,14 +19,20 @@ android/**/GeneratedPluginRegistrant.java
 
 # iOS / macOS
 ios/Flutter/ephemeral/
+ios/Runner/GeneratedPluginRegistrant.*
 ios/Flutter/Generated.xcconfig
 ios/Flutter/flutter_export_environment.sh
 macos/Flutter/ephemeral/
+macos/Flutter/GeneratedPluginRegistrant.*
 macos/Flutter/Generated.xcconfig
 macos/Flutter/flutter_export_environment.sh
 
 # Linux
 linux/flutter/ephemeral/
+linux/flutter/generated_plugin_registrant.*
+linux/flutter/generated_plugins.cmake
 
 # Windows
 windows/flutter/ephemeral/
+windows/flutter/generated_plugin_registrant.*
+windows/flutter/generated_plugins.cmake
