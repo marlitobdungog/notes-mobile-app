@@ -73,79 +73,84 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
         await _saveNote();
-        return true;
+        if (mounted) {
+          Navigator.pop(context);
+        }
       },
       child: Scaffold(
         backgroundColor: Color(widget.note.color),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          IconButton(icon: const Icon(Icons.push_pin_outlined), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.notifications_none_outlined), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.archive_outlined), onPressed: () {}),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _titleController,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
-              decoration: const InputDecoration(
-                hintText: 'Title',
-                border: InputBorder.none,
-              ),
-              maxLines: null,
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _contentController,
-              style: const TextStyle(fontSize: 18),
-              decoration: const InputDecoration(
-                hintText: 'Note',
-                border: InputBorder.none,
-              ),
-              maxLines: null,
-              autofocus: widget.note.content.isEmpty,
-            ),
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          actions: [
+            IconButton(icon: const Icon(Icons.push_pin_outlined), onPressed: () {}),
+            IconButton(icon: const Icon(Icons.notifications_none_outlined), onPressed: () {}),
+            IconButton(icon: const Icon(Icons.archive_outlined), onPressed: () {}),
           ],
         ),
-      ),
-      bottomNavigationBar: BottomAppBar(
-        child: Row(
-          children: [
-            IconButton(icon: const Icon(Icons.add_box_outlined), onPressed: () {}),
-            IconButton(icon: const Icon(Icons.palette_outlined), onPressed: () {}),
-            const Spacer(),
-            Text(
-              'Edited ${widget.note.createdAt.hour}:${widget.note.createdAt.minute.toString().padLeft(2, '0')}',
-              style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
-            ),
-            const Spacer(),
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert),
-              onSelected: (value) {
-                if (value == 'delete') {
-                  _deleteNote();
-                }
-              },
-              itemBuilder: (BuildContext context) => [
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Text('Delete'),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: _titleController,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
                 ),
-              ],
-            ),
-          ],
+                decoration: const InputDecoration(
+                  hintText: 'Title',
+                  border: InputBorder.none,
+                ),
+                maxLines: null,
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _contentController,
+                style: const TextStyle(fontSize: 18),
+                decoration: const InputDecoration(
+                  hintText: 'Note',
+                  border: InputBorder.none,
+                ),
+                maxLines: null,
+                autofocus: widget.note.content.isEmpty,
+              ),
+            ],
+          ),
+        ),
+        bottomNavigationBar: BottomAppBar(
+          child: Row(
+            children: [
+              IconButton(icon: const Icon(Icons.add_box_outlined), onPressed: () {}),
+              IconButton(icon: const Icon(Icons.palette_outlined), onPressed: () {}),
+              const Spacer(),
+              Text(
+                'Edited ${widget.note.createdAt.hour}:${widget.note.createdAt.minute.toString().padLeft(2, '0')}',
+                style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+              ),
+              const Spacer(),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert),
+                onSelected: (value) {
+                  if (value == 'delete') {
+                    _deleteNote();
+                  }
+                },
+                itemBuilder: (BuildContext context) => [
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Text('Delete'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

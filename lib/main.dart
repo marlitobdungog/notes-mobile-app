@@ -118,9 +118,9 @@ class _NotesScreenState extends State<NotesScreen> {
           _refreshNotes();
         },
         tooltip: 'Add Note',
-        child: const Icon(Icons.add, size: 32),
         backgroundColor: Colors.white,
         foregroundColor: Colors.blue,
+        child: const Icon(Icons.add, size: 32),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endDocked,
       bottomNavigationBar: BottomAppBar(
