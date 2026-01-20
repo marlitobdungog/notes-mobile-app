@@ -16,6 +16,7 @@ class NoteCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       elevation: 2,
+      clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(color: Colors.grey.shade300, width: 1),
@@ -62,7 +63,7 @@ class NoteCard extends StatelessWidget {
                         fontSize: 14,
                         color: Colors.black87,
                       ),
-                      maxLines: 8,
+                      maxLines: note.imagePath != null ? 3 : 6,
                       overflow: TextOverflow.ellipsis,
                     ),
                   if (note.labels.isNotEmpty) ...[
