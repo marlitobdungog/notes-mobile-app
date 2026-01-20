@@ -171,13 +171,16 @@ class _NotesScreenState extends State<NotesScreen> {
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
         notchMargin: 8.0,
-        child: Row(
-          children: [
-            IconButton(icon: const Icon(Icons.check_box_outlined), onPressed: () {}),
-            IconButton(icon: const Icon(Icons.brush_outlined), onPressed: () {}),
-            IconButton(icon: const Icon(Icons.mic_none_outlined), onPressed: () {}),
-            IconButton(icon: const Icon(Icons.image_outlined), onPressed: () {}),
-          ],
+        child: SizedBox(
+          height: 48.0,
+          child: Row(
+            children: [
+              IconButton(icon: const Icon(Icons.check_box_outlined), onPressed: () {}),
+              IconButton(icon: const Icon(Icons.brush_outlined), onPressed: () {}),
+              IconButton(icon: const Icon(Icons.mic_none_outlined), onPressed: () {}),
+              IconButton(icon: const Icon(Icons.image_outlined), onPressed: () {}),
+            ],
+          ),
         ),
       ),
     );
