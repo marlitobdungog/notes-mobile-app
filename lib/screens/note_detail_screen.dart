@@ -1,4 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
 import '../models/note.dart';
 import '../services/database_helper.dart';
 
@@ -20,12 +24,18 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
   late TextEditingController _titleController;
   late TextEditingController _contentController;
   bool _isDeleting = false;
+  late int _color;
+  String? _imagePath;
+  late List<String> _labels;
 
   @override
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.note.title);
     _contentController = TextEditingController(text: widget.note.content);
+    _color = widget.note.color;
+    _imagePath = widget.note.imagePath;
+    _labels = List.from(widget.note.labels);
   }
 
   @override
@@ -52,6 +62,9 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
       title: title,
       content: content,
       createdAt: DateTime.now(),
+      color: _color,
+      imagePath: _imagePath,
+      labels: _labels,
     );
 
     if (widget.isNew) {
@@ -71,6 +84,143 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
     }
   }
 
+  Future<void> _pickImage() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+
+    if (image != null) {
+      final appDir = await getApplicationDocumentsDirectory();
+      final fileName = path.basename(image.path);
+      final savedImage = await File(image.path).copy('${appDir.path}/$fileName');
+      setState(() {
+        _imagePath = savedImage.path;
+      });
+    }
+  }
+
+  void _showColorPicker() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return Container(
+          height: 100,
+          padding: const EdgeInsets.all(8.0),
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            children: [
+              _colorOption(0xFFFFFFFF), // White
+              _colorOption(0xFFF28B82), // Red
+              _colorOption(0xFFFBBC04), // Orange
+              _colorOption(0xFFFFF475), // Yellow
+              _colorOption(0xFFCCFF90), // Green
+              _colorOption(0xFFA7FFEB), // Teal
+              _colorOption(0xFFCBF0F8), // Blue
+              _colorOption(0xFFAECBFA), // Dark Blue
+              _colorOption(0xFFD7AEFB), // Purple
+              _colorOption(0xFFFDCFE8), // Pink
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _colorOption(int colorValue) {
+    return GestureDetector(
+      onTap: () {
+        setState(() => _color = colorValue);
+        Navigator.pop(context);
+      },
+      child: Container(
+        width: 50,
+        height: 50,
+        margin: const EdgeInsets.all(8.0),
+        decoration: BoxDecoration(
+          color: Color(colorValue),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: _color == colorValue ? const Icon(Icons.check) : null,
+      ),
+    );
+  }
+
+  void _showLabelPicker() async {
+    final allLabels = await DatabaseHelper.instance.getAllLabels();
+    final TextEditingController labelController = TextEditingController();
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Labels'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: labelController,
+                      decoration: InputDecoration(
+                        hintText: 'Create new label',
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.add),
+                          onPressed: () {
+                            final newLabel = labelController.text.trim();
+                            if (newLabel.isNotEmpty && !_labels.contains(newLabel)) {
+                              setState(() => _labels.add(newLabel));
+                              setDialogState(() {});
+                              labelController.clear();
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Flexible(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: allLabels.length,
+                        itemBuilder: (context, index) {
+                          final label = allLabels[index];
+                          final isSelected = _labels.contains(label);
+                          return CheckboxListTile(
+                            title: Text(label),
+                            value: isSelected,
+                            onChanged: (value) {
+                              setState(() {
+                                if (value == true) {
+                                  _labels.add(label);
+                                } else {
+                                  _labels.remove(label);
+                                }
+                              });
+                              setDialogState(() {});
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Done'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -83,7 +233,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
         }
       },
       child: Scaffold(
-        backgroundColor: Color(widget.note.color),
+        backgroundColor: Color(_color),
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -98,6 +248,26 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (_imagePath != null)
+                Stack(
+                  children: [
+                    Image.file(
+                      File(_imagePath!),
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.white),
+                        onPressed: () => setState(() => _imagePath = null),
+                        style: IconButton.styleFrom(backgroundColor: Colors.black45),
+                      ),
+                    ),
+                  ],
+                ),
+              const SizedBox(height: 16),
               TextField(
                 controller: _titleController,
                 style: const TextStyle(
@@ -121,14 +291,28 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                 maxLines: null,
                 autofocus: widget.note.content.isEmpty,
               ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                children: _labels.map((label) => Chip(
+                  label: Text(label),
+                  onDeleted: () => setState(() => _labels.remove(label)),
+                )).toList(),
+              ),
             ],
           ),
         ),
         bottomNavigationBar: BottomAppBar(
           child: Row(
             children: [
-              IconButton(icon: const Icon(Icons.add_box_outlined), onPressed: () {}),
-              IconButton(icon: const Icon(Icons.palette_outlined), onPressed: () {}),
+              IconButton(
+                icon: const Icon(Icons.add_box_outlined),
+                onPressed: _pickImage,
+              ),
+              IconButton(
+                icon: const Icon(Icons.palette_outlined),
+                onPressed: _showColorPicker,
+              ),
               const Spacer(),
               Text(
                 'Edited ${widget.note.createdAt.hour}:${widget.note.createdAt.minute.toString().padLeft(2, '0')}',
@@ -137,17 +321,23 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
               const Spacer(),
               PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert),
-                onSelected: (value) {
-                  if (value == 'delete') {
-                    _deleteNote();
-                  }
-                },
                 itemBuilder: (BuildContext context) => [
+                  const PopupMenuItem(
+                    value: 'labels',
+                    child: Text('Labels'),
+                  ),
                   const PopupMenuItem(
                     value: 'delete',
                     child: Text('Delete'),
                   ),
                 ],
+                onSelected: (value) {
+                  if (value == 'delete') {
+                    _deleteNote();
+                  } else if (value == 'labels') {
+                    _showLabelPicker();
+                  }
+                },
               ),
             ],
           ),
