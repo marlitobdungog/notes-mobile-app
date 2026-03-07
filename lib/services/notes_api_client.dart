@@ -172,6 +172,30 @@ class NotesApiClient {
     )) as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> updateLabel({
+    required int labelId,
+    required int userId,
+    required String name,
+  }) async {
+    return (await _request(
+      'PUT',
+      '/api/labels/$labelId',
+      queryParameters: {'user_id': '$userId'},
+      body: {'name': name},
+    )) as Map<String, dynamic>;
+  }
+
+  Future<void> deleteLabel({
+    required int labelId,
+    required int userId,
+  }) async {
+    await _request(
+      'DELETE',
+      '/api/labels/$labelId',
+      queryParameters: {'user_id': '$userId'},
+    );
+  }
+
   Future<Map<String, dynamic>> createNote(Map<String, dynamic> payload) async {
     return (await _request('POST', '/api/notes/', body: payload)) as Map<String, dynamic>;
   }

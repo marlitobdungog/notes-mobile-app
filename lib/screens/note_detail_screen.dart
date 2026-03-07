@@ -55,9 +55,11 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
   late FocusNode _contentFocusNode;
   bool _isDeleting = false;
   late bool _isPinned;
+  late bool _isArchived;
   late int _color;
   String? _imagePath;
   late List<String> _labels;
+  Map<String, dynamic>? _popResult;
 
   bool get _useDarkForeground => Color(_color).computeLuminance() > 0.5;
   Color get _primaryTextColor => _useDarkForeground ? Colors.black : Colors.white;
@@ -72,6 +74,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
     _titleFocusNode = FocusNode();
     _contentFocusNode = FocusNode();
     _isPinned = widget.note.pinned;
+    _isArchived = widget.note.archived;
     _color = widget.note.color;
     _imagePath = widget.note.imagePath;
     _labels = List.from(widget.note.labels);
@@ -106,26 +109,31 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
       createdAt: DateTime.now(),
       color: _color,
       pinned: _isPinned,
+      archived: _isArchived,
       imagePath: _imagePath,
       labels: _labels,
     );
 
     if (widget.isNew) {
       await DatabaseHelper.instance.insertNote(note);
+      // For new notes, wait for first remote upsert so any ID remap is done
+      // before returning to the list (avoids stale-ID delete behavior).
+      await NoteSyncService.instance.safeUpsertRemote(note);
     } else {
       await DatabaseHelper.instance.updateNote(note);
+      unawaited(NoteSyncService.instance.safeUpsertRemote(note));
     }
-    unawaited(NoteSyncService.instance.safeUpsertRemote(note));
   }
 
   Future<void> _deleteNote() async {
     _isDeleting = true;
+    _popResult = {'deletedId': widget.note.id};
     if (!widget.isNew) {
       await DatabaseHelper.instance.deleteNote(widget.note.id);
       unawaited(NoteSyncService.instance.safeDeleteRemoteByPublicId(widget.note.id));
     }
     if (mounted) {
-      Navigator.pop(context);
+      Navigator.pop(context, _popResult);
     }
   }
 
@@ -269,7 +277,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
         if (didPop) return;
         await _saveNote();
         if (mounted) {
-          Navigator.pop(context);
+          Navigator.pop(context, _popResult);
         }
       },
       child: Scaffold(
@@ -283,7 +291,16 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
               onPressed: () => setState(() => _isPinned = !_isPinned),
             ),
             IconButton(icon: Icon(Icons.notifications_none_outlined, color: _iconColor), onPressed: () {}),
-            IconButton(icon: Icon(Icons.archive_outlined, color: _iconColor), onPressed: () {}),
+            IconButton(
+              icon: Icon(_isArchived ? Icons.unarchive_outlined : Icons.archive_outlined, color: _iconColor),
+              onPressed: () async {
+                setState(() => _isArchived = !_isArchived);
+                await _saveNote();
+                if (mounted) {
+                  Navigator.pop(context);
+                }
+              },
+            ),
           ],
         ),
         body: GestureDetector(

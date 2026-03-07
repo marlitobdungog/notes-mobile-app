@@ -152,4 +152,94 @@ class NoteSyncService {
       debugPrint('Delete sync failed: $e');
     }
   }
+
+  Future<void> createLabelRemote({
+    required String name,
+    int? userId,
+  }) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
+    final activeUserId = _resolveUserId(userId);
+    final labelMap = await _labelIdByName(activeUserId);
+    if (labelMap.containsKey(trimmed)) return;
+    await _apiClient.createLabel(userId: activeUserId, name: trimmed);
+  }
+
+  Future<void> renameLabelRemote({
+    required String oldName,
+    required String newName,
+    int? userId,
+  }) async {
+    final from = oldName.trim();
+    final to = newName.trim();
+    if (from.isEmpty || to.isEmpty || from == to) return;
+    final activeUserId = _resolveUserId(userId);
+    final labelMap = await _labelIdByName(activeUserId);
+    final remoteId = labelMap[from];
+    if (remoteId == null) {
+      if (!labelMap.containsKey(to)) {
+        await _apiClient.createLabel(userId: activeUserId, name: to);
+      }
+      return;
+    }
+    await _apiClient.updateLabel(
+      labelId: remoteId,
+      userId: activeUserId,
+      name: to,
+    );
+  }
+
+  Future<void> deleteLabelRemote({
+    required String name,
+    int? userId,
+  }) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
+    final activeUserId = _resolveUserId(userId);
+    final labelMap = await _labelIdByName(activeUserId);
+    final remoteId = labelMap[trimmed];
+    if (remoteId == null) return;
+    await _apiClient.deleteLabel(
+      labelId: remoteId,
+      userId: activeUserId,
+    );
+  }
+
+  Future<void> safeCreateLabelRemote({
+    required String name,
+    int? userId,
+  }) async {
+    try {
+      await createLabelRemote(name: name, userId: userId);
+    } catch (e) {
+      debugPrint('Create label sync failed: $e');
+    }
+  }
+
+  Future<void> safeRenameLabelRemote({
+    required String oldName,
+    required String newName,
+    int? userId,
+  }) async {
+    try {
+      await renameLabelRemote(
+        oldName: oldName,
+        newName: newName,
+        userId: userId,
+      );
+    } catch (e) {
+      debugPrint('Rename label sync failed: $e');
+    }
+  }
+
+  Future<void> safeDeleteLabelRemote({
+    required String name,
+    int? userId,
+  }) async {
+    try {
+      await deleteLabelRemote(name: name, userId: userId);
+    } catch (e) {
+      debugPrint('Delete label sync failed: $e');
+    }
+  }
 }

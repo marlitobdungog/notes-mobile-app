@@ -10,6 +10,7 @@ class Note {
   final DateTime createdAt;
   final int color; // Store color as an ARGB integer
   final bool pinned;
+  final bool archived;
   final String? imagePath;
   final List<String> labels;
 
@@ -21,6 +22,7 @@ class Note {
     required this.createdAt,
     this.color = 0xFFFFFFFF, // Default white
     this.pinned = false,
+    this.archived = false,
     this.imagePath,
     this.labels = const [],
   });
@@ -34,6 +36,7 @@ class Note {
       'createdAt': createdAt.toIso8601String(),
       'color': color,
       'pinned': pinned ? 1 : 0,
+      'archived': archived ? 1 : 0,
       'imagePath': imagePath,
     };
   }
@@ -49,6 +52,7 @@ class Note {
       createdAt: DateTime.parse(map['createdAt']),
       color: map['color'],
       pinned: map['pinned'] == true || map['pinned'] == 1,
+      archived: map['archived'] == true || map['archived'] == 1,
       imagePath: map['imagePath'],
       labels: labels,
     );
@@ -62,6 +66,7 @@ class Note {
     DateTime? createdAt,
     int? color,
     bool? pinned,
+    bool? archived,
     String? imagePath,
     List<String>? labels,
   }) {
@@ -73,6 +78,7 @@ class Note {
       createdAt: createdAt ?? this.createdAt,
       color: color ?? this.color,
       pinned: pinned ?? this.pinned,
+      archived: archived ?? this.archived,
       imagePath: imagePath ?? this.imagePath,
       labels: labels ?? this.labels,
     );

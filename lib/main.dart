@@ -92,7 +92,7 @@ class _KeepCloneAppState extends State<KeepCloneApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Keep Clone',
+      title: 'Let Notes',
       debugShowCheckedModeBanner: false,
       themeMode: _themeMode,
       theme: ThemeData(
@@ -140,9 +140,11 @@ class _NotesScreenState extends State<NotesScreen> {
   List<Note> _notes = [];
   List<String> _labels = [];
   String? _selectedLabel;
+  bool _showArchived = false;
   bool _isLoading = true;
   bool _isSyncing = false;
   String? _syncError;
+  bool _isListView = false;
 
   @override
   void initState() {
@@ -203,14 +205,158 @@ class _NotesScreenState extends State<NotesScreen> {
     await _refreshNotes();
   }
 
+  Future<void> _createLabel(BuildContext context) async {
+    final controller = TextEditingController();
+    final created = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('New label'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(hintText: 'Label name'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Create'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (created != true) return;
+
+    try {
+      final createdName = controller.text.trim();
+      await DatabaseHelper.instance.createLabel(createdName);
+      await NoteSyncService.instance.safeCreateLabelRemote(name: createdName);
+      await _refreshNotes();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
+  Future<void> _renameLabel(BuildContext context, String currentName) async {
+    final controller = TextEditingController(text: currentName);
+    final renamed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Rename label'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(hintText: 'Label name'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (renamed != true) return;
+
+    try {
+      final renamedTo = controller.text.trim();
+      await DatabaseHelper.instance.renameLabel(currentName, renamedTo);
+      await NoteSyncService.instance.safeRenameLabelRemote(
+        oldName: currentName,
+        newName: renamedTo,
+      );
+      if (_selectedLabel == currentName) {
+        setState(() => _selectedLabel = renamedTo);
+      }
+      await _refreshNotes();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
+  Future<void> _deleteLabel(BuildContext context, String labelName) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete label'),
+          content: Text('Delete "$labelName"?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await DatabaseHelper.instance.deleteLabel(labelName);
+      await NoteSyncService.instance.safeDeleteLabelRemote(name: labelName);
+      if (_selectedLabel == labelName) {
+        setState(() => _selectedLabel = null);
+      }
+      await _refreshNotes();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
+  void _applyDetailResult(dynamic result) {
+    if (result is! Map<String, dynamic>) return;
+    final deletedId = result['deletedId'] as String?;
+    if (deletedId == null || deletedId.isEmpty) return;
+
+    setState(() {
+      _notes = _notes.where((note) => note.id != deletedId).toList();
+    });
+  }
+
   List<Note> get _filteredNotes {
-    if (_selectedLabel == null) return _notes;
-    return _notes.where((note) => note.labels.contains(_selectedLabel)).toList();
+    if (_showArchived) {
+      return _notes.where((note) => note.archived).toList();
+    }
+    if (_selectedLabel == null) {
+      return _notes.where((note) => !note.archived).toList();
+    }
+    return _notes.where((note) => !note.archived && note.labels.contains(_selectedLabel)).toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    final appBarTitle = _selectedLabel ?? 'Keep Clone';
+    final appBarTitle = _showArchived ? 'Archive' : (_selectedLabel ?? 'Let Notes');
+    final selectedLabelBg = Theme.of(context).brightness == Brightness.dark
+        ? Colors.blue.withOpacity(0.28)
+        : Colors.blue.withOpacity(0.16);
 
     return Scaffold(
       appBar: AppBar(
@@ -221,8 +367,8 @@ class _NotesScreenState extends State<NotesScreen> {
             onPressed: () {},
           ),
           IconButton(
-            icon: const Icon(Icons.view_agenda_outlined),
-            onPressed: () {},
+            icon: Icon(_isListView ? Icons.grid_view_outlined : Icons.view_agenda_outlined),
+            onPressed: () => setState(() => _isListView = !_isListView),
           ),
         ],
       ),
@@ -230,19 +376,35 @@ class _NotesScreenState extends State<NotesScreen> {
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            const DrawerHeader(
-              decoration: BoxDecoration(color: Colors.blue),
-              child: Text(
-                'Google Keep Clone',
+            Container(
+              color: Colors.blue,
+              padding: const EdgeInsets.fromLTRB(16, 52, 16, 16),
+              child: const Text(
+                'Let Notes',
                 style: TextStyle(color: Colors.white, fontSize: 24),
               ),
             ),
             ListTile(
               leading: const Icon(Icons.lightbulb_outline),
               title: const Text('Notes'),
-              selected: _selectedLabel == null,
+              selected: _selectedLabel == null && !_showArchived,
               onTap: () {
-                setState(() => _selectedLabel = null);
+                setState(() {
+                  _selectedLabel = null;
+                  _showArchived = false;
+                });
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.archive_outlined),
+              title: const Text('Archive'),
+              selected: _showArchived,
+              onTap: () {
+                setState(() {
+                  _selectedLabel = null;
+                  _showArchived = true;
+                });
                 Navigator.pop(context);
               },
             ),
@@ -261,19 +423,54 @@ class _NotesScreenState extends State<NotesScreen> {
               },
             ),
             const Divider(),
-            const Padding(
-              padding: EdgeInsets.only(left: 16.0, top: 8.0, bottom: 8.0),
-              child: Text('LABELS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+            Padding(
+              padding: const EdgeInsets.only(left: 16.0, top: 8.0, bottom: 8.0, right: 8.0),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'LABELS',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Add label',
+                    onPressed: () => _createLabel(context),
+                    icon: const Icon(Icons.add, size: 20),
+                  ),
+                ],
+              ),
             ),
             ..._labels.map((label) => ListTile(
               leading: const Icon(Icons.label_outline),
               title: Text(label),
               selected: _selectedLabel == label,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              selectedTileColor: selectedLabelBg,
+              trailing: PopupMenuButton<String>(
+                onSelected: (action) {
+                  if (action == 'edit') {
+                    _renameLabel(context, label);
+                  } else if (action == 'delete') {
+                    _deleteLabel(context, label);
+                  }
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem(value: 'edit', child: Text('Edit')),
+                  PopupMenuItem(value: 'delete', child: Text('Delete')),
+                ],
+              ),
               onTap: () {
-                setState(() => _selectedLabel = label);
+                setState(() {
+                  _selectedLabel = label;
+                  _showArchived = false;
+                });
                 Navigator.pop(context);
               },
             )),
+            const SizedBox(height: 24),
           ],
         ),
       ),
@@ -291,77 +488,103 @@ class _NotesScreenState extends State<NotesScreen> {
                             child: Text(
                               _syncError != null
                                   ? 'Sync error: $_syncError'
-                                  : (_selectedLabel == null ? 'No notes yet' : 'No notes with this label'),
+                                  : (_showArchived
+                                      ? 'No archived notes'
+                                      : (_selectedLabel == null ? 'No notes yet' : 'No notes with this label')),
                             ),
                           ),
                         ),
                       ],
                     )
-                  : Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: GridView.builder(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 8,
-                          mainAxisSpacing: 8,
-                          childAspectRatio: 0.85,
-                        ),
-                        itemCount: _filteredNotes.length,
-                        itemBuilder: (context, index) {
-                          final note = _filteredNotes[index];
-                          return NoteCard(
-                            note: note,
-                            onTap: () async {
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => NoteDetailScreen(note: note),
+                  : _isListView
+                      ? ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(8.0),
+                          itemCount: _filteredNotes.length,
+                          itemBuilder: (context, index) {
+                            final note = _filteredNotes[index];
+                            return SizedBox(
+                              height: 132,
+                              child: Padding(
+                                padding: const EdgeInsets.only(bottom: 8.0),
+                                child: NoteCard(
+                                  note: note,
+                                  onTap: () async {
+                                    final result = await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => NoteDetailScreen(note: note),
+                                      ),
+                                    );
+                                    _applyDetailResult(result);
+                                    _refreshNotes();
+                                  },
                                 ),
-                              );
-                              _refreshNotes();
-                            },
-                          );
-                        },
-                      ),
+                              ),
+                            );
+                          },
+                        )
+                      : Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: GridView.builder(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                              childAspectRatio: 0.85,
+                            ),
+                            itemCount: _filteredNotes.length,
+                            itemBuilder: (context, index) {
+                            final note = _filteredNotes[index];
+                            return NoteCard(
+                              note: note,
+                              onTap: () async {
+                                final result = await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => NoteDetailScreen(note: note),
+                                  ),
+                                );
+                                _applyDetailResult(result);
+                                _refreshNotes();
+                              },
+                            );
+                          },
+                        ),
+                        ),
+            ),
+      floatingActionButton: _showArchived
+          ? null
+          : Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: FloatingActionButton(
+                onPressed: () async {
+                  final newNote = Note(
+                    id: NoteIdGenerator.generatePublicId(),
+                    userId: DatabaseHelper.instance.userId,
+                    title: '',
+                    content: '',
+                    createdAt: DateTime.now(),
+                    color: widget.isDarkMode ? _darkDefaultNoteColor : _lightDefaultNoteColor,
+                    labels: _selectedLabel != null ? [_selectedLabel!] : const [],
+                  );
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => NoteDetailScreen(note: newNote, isNew: true),
                     ),
+                  );
+                  _applyDetailResult(result);
+                  _refreshNotes();
+                },
+                tooltip: 'Add Note',
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.blue,
+                child: const Icon(Icons.add, size: 32),
+              ),
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final newNote = Note(
-            id: NoteIdGenerator.generatePublicId(),
-            userId: DatabaseHelper.instance.userId,
-            title: '',
-            content: '',
-            createdAt: DateTime.now(),
-            color: widget.isDarkMode ? _darkDefaultNoteColor : _lightDefaultNoteColor,
-          );
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => NoteDetailScreen(note: newNote, isNew: true),
-            ),
-          );
-          _refreshNotes();
-        },
-        tooltip: 'Add Note',
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.blue,
-        child: const Icon(Icons.add, size: 32),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endDocked,
-      bottomNavigationBar: BottomAppBar(
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 8.0,
-        child: Row(
-          children: [
-            IconButton(icon: const Icon(Icons.check_box_outlined), onPressed: () {}),
-            IconButton(icon: const Icon(Icons.brush_outlined), onPressed: () {}),
-            IconButton(icon: const Icon(Icons.mic_none_outlined), onPressed: () {}),
-            IconButton(icon: const Icon(Icons.image_outlined), onPressed: () {}),
-          ],
-        ),
-      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }

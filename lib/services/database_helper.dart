@@ -33,7 +33,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 5,
+      version: 6,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
@@ -52,6 +52,7 @@ class DatabaseHelper {
         createdAt TEXT,
         color INTEGER,
         pinned INTEGER NOT NULL DEFAULT 0,
+        archived INTEGER NOT NULL DEFAULT 0,
         imagePath TEXT
       )
     ''');
@@ -182,6 +183,10 @@ class DatabaseHelper {
 
     if (oldVersion < 5) {
       await db.execute('ALTER TABLE notes ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0');
+    }
+
+    if (oldVersion < 6) {
+      await db.execute('ALTER TABLE notes ADD COLUMN archived INTEGER NOT NULL DEFAULT 0');
     }
   }
 
@@ -387,6 +392,81 @@ class DatabaseHelper {
       orderBy: 'name ASC',
     );
     return result.map((row) => row['name'] as String).toList();
+  }
+
+  Future<void> createLabel(String name, {int? userId}) async {
+    final normalizedName = name.trim();
+    if (normalizedName.isEmpty) {
+      throw ArgumentError('Label name cannot be empty');
+    }
+
+    final db = await instance.database;
+    final activeUserId = _resolveUserId(userId);
+    final existing = await db.query(
+      'labels',
+      where: 'user_id = ? AND name = ?',
+      whereArgs: [activeUserId, normalizedName],
+      limit: 1,
+    );
+    if (existing.isNotEmpty) {
+      throw Exception('Label already exists');
+    }
+
+    await db.insert('labels', {
+      'id': const Uuid().v4(),
+      'user_id': activeUserId,
+      'name': normalizedName,
+    });
+  }
+
+  Future<void> renameLabel(
+    String oldName,
+    String newName, {
+    int? userId,
+  }) async {
+    final previousName = oldName.trim();
+    final normalizedNewName = newName.trim();
+    if (previousName.isEmpty || normalizedNewName.isEmpty) {
+      throw ArgumentError('Label name cannot be empty');
+    }
+    if (previousName == normalizedNewName) return;
+
+    final db = await instance.database;
+    final activeUserId = _resolveUserId(userId);
+    final duplicate = await db.query(
+      'labels',
+      where: 'user_id = ? AND name = ?',
+      whereArgs: [activeUserId, normalizedNewName],
+      limit: 1,
+    );
+    if (duplicate.isNotEmpty) {
+      throw Exception('Label already exists');
+    }
+
+    final result = await db.update(
+      'labels',
+      {'name': normalizedNewName},
+      where: 'user_id = ? AND name = ?',
+      whereArgs: [activeUserId, previousName],
+    );
+    if (result == 0) {
+      throw Exception('Label not found');
+    }
+  }
+
+  Future<void> deleteLabel(String name, {int? userId}) async {
+    final normalizedName = name.trim();
+    if (normalizedName.isEmpty) {
+      throw ArgumentError('Label name cannot be empty');
+    }
+
+    final db = await instance.database;
+    final activeUserId = _resolveUserId(userId);
+    await db.delete(
+      'labels',
+      where: 'user_id = ? AND name = ?',
+      whereArgs: [activeUserId, normalizedName],
+    );
   }
 
   Future<void> close() async {

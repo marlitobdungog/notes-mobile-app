@@ -19,12 +19,14 @@ class NoteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkTheme = Theme.of(context).brightness == Brightness.dark;
     final noteColor = Color(note.color);
     final useDarkForeground = _useDarkForeground(noteColor);
     final primaryTextColor = useDarkForeground ? Colors.black : Colors.white;
     final secondaryTextColor = useDarkForeground ? Colors.black87 : Colors.white70;
     final chipBgColor = useDarkForeground ? Colors.black.withOpacity(0.06) : Colors.white.withOpacity(0.14);
     final chipBorderColor = useDarkForeground ? Colors.black.withOpacity(0.12) : Colors.white.withOpacity(0.28);
+    final cardBorderColor = isDarkTheme ? Colors.white.withOpacity(0.10) : Colors.grey.shade300;
     final visibleLabels = note.labels.take(2).toList();
     final remainingLabels = note.labels.length - visibleLabels.length;
     final labelSummary = [
@@ -36,7 +38,7 @@ class NoteCard extends StatelessWidget {
       elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: Colors.grey.shade300, width: 1),
+        side: BorderSide(color: cardBorderColor, width: 1),
       ),
       clipBehavior: Clip.antiAlias,
       color: noteColor,
@@ -90,23 +92,25 @@ class NoteCard extends StatelessWidget {
                           ),
                         if (visibleLabels.isNotEmpty) ...[
                           const SizedBox(height: 8),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: chipBgColor,
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: chipBorderColor),
-                            ),
-                            child: Text(
-                              labelSummary,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
-                                color: primaryTextColor,
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: chipBgColor,
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: chipBorderColor),
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              child: Text(
+                                labelSummary,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                  color: primaryTextColor,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ),
                         ],
