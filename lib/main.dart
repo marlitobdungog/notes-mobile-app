@@ -22,6 +22,7 @@ class KeepCloneApp extends StatefulWidget {
 class _KeepCloneAppState extends State<KeepCloneApp> {
   static const String _themeModePrefKey = 'theme_mode';
   static const String _userIdPrefKey = 'user_id';
+  static const String _apiAuthHeaderPrefKey = 'api_auth_header';
   ThemeMode _themeMode = ThemeMode.light;
   int? _currentUserId;
 
@@ -53,19 +54,23 @@ class _KeepCloneAppState extends State<KeepCloneApp> {
   Future<void> _loadUserSession() async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getInt(_userIdPrefKey);
+    final authHeader = prefs.getString(_apiAuthHeaderPrefKey);
     if (userId != null && userId > 0) {
       DatabaseHelper.instance.setUserId(userId);
     }
+    NotesApiClient.setRuntimeAuthorizationHeader(authHeader);
     if (!mounted) return;
     setState(() {
       _currentUserId = userId;
     });
   }
 
-  Future<void> _onLoginSuccess(int userId) async {
+  Future<void> _onLoginSuccess(int userId, String authHeader) async {
     DatabaseHelper.instance.setUserId(userId);
+    NotesApiClient.setRuntimeAuthorizationHeader(authHeader);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_userIdPrefKey, userId);
+    await prefs.setString(_apiAuthHeaderPrefKey, authHeader);
     if (!mounted) return;
     setState(() {
       _currentUserId = userId;
@@ -75,6 +80,8 @@ class _KeepCloneAppState extends State<KeepCloneApp> {
   Future<void> _logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_userIdPrefKey);
+    await prefs.remove(_apiAuthHeaderPrefKey);
+    NotesApiClient.setRuntimeAuthorizationHeader(null);
     DatabaseHelper.instance.setUserId(Note.defaultUserId);
     if (!mounted) return;
     setState(() {
@@ -147,7 +154,9 @@ class _NotesScreenState extends State<NotesScreen> {
     if (syncRemote) {
       setState(() => _isSyncing = true);
       try {
-        final count = await NoteSyncService.instance.pullWithResult();
+        final count = await NoteSyncService.instance.pullWithResult(
+          preferDarkDefault: widget.isDarkMode,
+        );
         debugPrint('Initial sync completed: $count notes pulled');
         _syncError = null;
       } catch (e) {
@@ -171,7 +180,9 @@ class _NotesScreenState extends State<NotesScreen> {
   Future<void> _syncNow() async {
     setState(() => _isSyncing = true);
     try {
-      final count = await NoteSyncService.instance.pullWithResult();
+      final count = await NoteSyncService.instance.pullWithResult(
+        preferDarkDefault: widget.isDarkMode,
+      );
       _syncError = null;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -198,9 +209,11 @@ class _NotesScreenState extends State<NotesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final appBarTitle = _selectedLabel ?? 'Keep Clone';
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Keep Clone'),
+        title: Text(appBarTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
@@ -209,16 +222,6 @@ class _NotesScreenState extends State<NotesScreen> {
           IconButton(
             icon: const Icon(Icons.view_agenda_outlined),
             onPressed: () {},
-          ),
-          IconButton(
-            icon: _isSyncing
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.sync),
-            onPressed: _isSyncing ? null : _syncNow,
           ),
         ],
       ),
@@ -275,41 +278,53 @@ class _NotesScreenState extends State<NotesScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _filteredNotes.isEmpty
-              ? Center(
-                  child: Text(
-                    _syncError != null
-                        ? 'Sync error: $_syncError'
-                        : (_selectedLabel == null ? 'No notes yet' : 'No notes with this label'),
-                  ),
-                )
-              : Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: GridView.builder(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
-                      childAspectRatio: 0.85,
-                    ),
-                    itemCount: _filteredNotes.length,
-                    itemBuilder: (context, index) {
-                      final note = _filteredNotes[index];
-                      return NoteCard(
-                        note: note,
-                        onTap: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => NoteDetailScreen(note: note),
+          : RefreshIndicator(
+              onRefresh: _syncNow,
+              child: _filteredNotes.isEmpty
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        SizedBox(
+                          height: MediaQuery.of(context).size.height * 0.6,
+                          child: Center(
+                            child: Text(
+                              _syncError != null
+                                  ? 'Sync error: $_syncError'
+                                  : (_selectedLabel == null ? 'No notes yet' : 'No notes with this label'),
                             ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: GridView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
+                          childAspectRatio: 0.85,
+                        ),
+                        itemCount: _filteredNotes.length,
+                        itemBuilder: (context, index) {
+                          final note = _filteredNotes[index];
+                          return NoteCard(
+                            note: note,
+                            onTap: () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => NoteDetailScreen(note: note),
+                                ),
+                              );
+                              _refreshNotes();
+                            },
                           );
-                          _refreshNotes();
                         },
-                      );
-                    },
-                  ),
-                ),
+                      ),
+                    ),
+            ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           final newNote = Note(
@@ -351,7 +366,7 @@ class _NotesScreenState extends State<NotesScreen> {
 }
 
 class LoginScreen extends StatefulWidget {
-  final Future<void> Function(int userId) onLoginSuccess;
+  final Future<void> Function(int userId, String authHeader) onLoginSuccess;
 
   const LoginScreen({
     Key? key,
@@ -401,7 +416,18 @@ class _LoginScreenState extends State<LoginScreen> {
       if (userId == null || userId <= 0) {
         throw Exception('Invalid login response');
       }
-      await widget.onLoginSuccess(userId);
+      final apiKeyResponse = await client.createApiKey(
+        email: email,
+        password: password,
+        name: 'Mobile App',
+      );
+      final apiKey = apiKeyResponse['key'] as String?;
+      if (apiKey == null || apiKey.trim().isEmpty) {
+        throw Exception('API key was not returned');
+      }
+
+      final authHeader = 'Bearer ${apiKey.trim()}';
+      await widget.onLoginSuccess(userId, authHeader);
     } catch (e) {
       setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     } finally {

@@ -25,6 +25,12 @@ class NoteCard extends StatelessWidget {
     final secondaryTextColor = useDarkForeground ? Colors.black87 : Colors.white70;
     final chipBgColor = useDarkForeground ? Colors.black.withOpacity(0.06) : Colors.white.withOpacity(0.14);
     final chipBorderColor = useDarkForeground ? Colors.black.withOpacity(0.12) : Colors.white.withOpacity(0.28);
+    final visibleLabels = note.labels.take(2).toList();
+    final remainingLabels = note.labels.length - visibleLabels.length;
+    final labelSummary = [
+      ...visibleLabels,
+      if (remainingLabels > 0) '+$remainingLabels',
+    ].join(' • ');
 
     return Card(
       elevation: 2,
@@ -32,13 +38,13 @@ class NoteCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(color: Colors.grey.shade300, width: 1),
       ),
+      clipBehavior: Clip.antiAlias,
       color: noteColor,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
           children: [
             if (note.imagePath != null)
               ClipRRect(
@@ -50,40 +56,40 @@ class NoteCard extends StatelessWidget {
                   fit: BoxFit.cover,
                 ),
               ),
-            Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (note.title.isNotEmpty)
-                Text(
-                  note.title,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: primaryTextColor,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              if (note.title.isNotEmpty && note.content.isNotEmpty)
-                const SizedBox(height: 8),
-              if (note.content.isNotEmpty)
-                    Text(
-                      note.content,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: secondaryTextColor,
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (note.title.isNotEmpty)
+                      Text(
+                        note.title,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: primaryTextColor,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 8,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  if (note.labels.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 4,
-                      runSpacing: 4,
-                      children: note.labels.map((label) => Container(
+                    if (note.title.isNotEmpty && note.content.isNotEmpty) const SizedBox(height: 8),
+                    if (note.content.isNotEmpty)
+                      Flexible(
+                        child: Text(
+                          note.content,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: secondaryTextColor,
+                          ),
+                          maxLines: 8,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    if (visibleLabels.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: chipBgColor,
@@ -91,17 +97,19 @@ class NoteCard extends StatelessWidget {
                           border: Border.all(color: chipBorderColor),
                         ),
                         child: Text(
-                          label,
+                          labelSummary,
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w500,
                             color: primaryTextColor,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      )).toList(),
-                    ),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           ],

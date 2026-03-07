@@ -44,7 +44,10 @@ class NoteSyncService {
     return _apiClient.getAllNotes(userId: userId);
   }
 
-  Future<int> pullFromRemote({int? userId}) async {
+  Future<int> pullFromRemote({
+    int? userId,
+    bool preferDarkDefault = false,
+  }) async {
     final activeUserId = _resolveUserId(userId);
     debugPrint('Pulling notes from API for user_id=$activeUserId');
     final remoteNotes = await _remoteNotes(activeUserId);
@@ -55,6 +58,7 @@ class NoteSyncService {
       final local = NoteApiMapper.fromApi(
         remote,
         fallbackUserId: activeUserId,
+        preferDarkDefault: preferDarkDefault,
       );
       await DatabaseHelper.instance.insertNote(local, userId: activeUserId);
       upserted++;
@@ -115,16 +119,22 @@ class NoteSyncService {
     );
   }
 
-  Future<void> safePullFromRemote({int? userId}) async {
+  Future<void> safePullFromRemote({
+    int? userId,
+    bool preferDarkDefault = false,
+  }) async {
     try {
-      await pullFromRemote(userId: userId);
+      await pullFromRemote(userId: userId, preferDarkDefault: preferDarkDefault);
     } catch (e) {
       debugPrint('Pull sync failed: $e');
     }
   }
 
-  Future<int> pullWithResult({int? userId}) async {
-    return pullFromRemote(userId: userId);
+  Future<int> pullWithResult({
+    int? userId,
+    bool preferDarkDefault = false,
+  }) async {
+    return pullFromRemote(userId: userId, preferDarkDefault: preferDarkDefault);
   }
 
   Future<void> safeUpsertRemote(Note note, {int? userId}) async {

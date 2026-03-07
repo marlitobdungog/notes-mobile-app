@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -91,8 +92,8 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
 
     if (title.isEmpty && content.isEmpty) {
       if (!widget.isNew) {
-        await NoteSyncService.instance.safeDeleteRemoteByPublicId(widget.note.id);
         await DatabaseHelper.instance.deleteNote(widget.note.id);
+        unawaited(NoteSyncService.instance.safeDeleteRemoteByPublicId(widget.note.id));
       }
       return;
     }
@@ -111,14 +112,14 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
     } else {
       await DatabaseHelper.instance.updateNote(note);
     }
-    await NoteSyncService.instance.safeUpsertRemote(note);
+    unawaited(NoteSyncService.instance.safeUpsertRemote(note));
   }
 
   Future<void> _deleteNote() async {
     _isDeleting = true;
     if (!widget.isNew) {
-      await NoteSyncService.instance.safeDeleteRemoteByPublicId(widget.note.id);
       await DatabaseHelper.instance.deleteNote(widget.note.id);
+      unawaited(NoteSyncService.instance.safeDeleteRemoteByPublicId(widget.note.id));
     }
     if (mounted) {
       Navigator.pop(context);

@@ -21,6 +21,7 @@ class NoteApiMapper {
   static Note fromApi(
     Map<String, dynamic> json, {
     int fallbackUserId = Note.defaultUserId,
+    bool preferDarkDefault = false,
   }) {
     final labels = (json['labels'] as List<dynamic>? ?? const [])
         .map((label) => (label as Map<String, dynamic>)['name'] as String)
@@ -29,6 +30,10 @@ class NoteApiMapper {
     final publicId = (json['public_id'] as String?)?.trim();
     final fallbackId = json['id']?.toString() ?? NoteIdGenerator.generatePublicId();
     final createdAtString = json['updated_at'] as String? ?? json['created_at'] as String?;
+    final apiColor = (json['color'] as String?) ?? 'note-gray';
+    final resolvedColor = preferDarkDefault && apiColor == 'note-gray'
+        ? 0xFF202124
+        : (_apiToMobileColor[apiColor] ?? 0xFFFFFFFF);
     final jsonUserId = (json['user_id'] is int)
         ? json['user_id'] as int
         : int.tryParse(json['user_id']?.toString() ?? '');
@@ -39,7 +44,7 @@ class NoteApiMapper {
       title: (json['title'] as String?) ?? '',
       content: (json['content'] as String?) ?? '',
       createdAt: createdAtString != null ? DateTime.parse(createdAtString).toLocal() : DateTime.now(),
-      color: _apiToMobileColor[(json['color'] as String?) ?? 'note-gray'] ?? 0xFFFFFFFF,
+      color: resolvedColor,
       labels: labels,
     );
   }

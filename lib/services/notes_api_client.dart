@@ -8,8 +8,14 @@ class NotesApiClient {
   static const String defaultBaseUrl = 'https://let-notes-api-1083135128051.asia-southeast1.run.app';
   static const String _authorizationHeader = String.fromEnvironment('LET_NOTES_API_AUTH_HEADER', defaultValue: '');
   static const String _apiKeyHeader = String.fromEnvironment('LET_NOTES_API_KEY', defaultValue: '');
+  static String? _runtimeAuthorizationHeader;
   final String baseUrl;
   static const Duration _requestTimeout = Duration(seconds: 12);
+
+  static void setRuntimeAuthorizationHeader(String? value) {
+    final normalized = value?.trim();
+    _runtimeAuthorizationHeader = (normalized == null || normalized.isEmpty) ? null : normalized;
+  }
 
   Uri _uri(String path, [Map<String, String>? queryParameters]) {
     final normalizedBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
@@ -27,8 +33,9 @@ class NotesApiClient {
     final headers = <String, String>{
       'Content-Type': 'application/json',
     };
-    if (_authorizationHeader.trim().isNotEmpty) {
-      headers['Authorization'] = _authorizationHeader.trim();
+    final effectiveAuthorizationHeader = _runtimeAuthorizationHeader ?? _authorizationHeader.trim();
+    if (effectiveAuthorizationHeader.isNotEmpty) {
+      headers['Authorization'] = effectiveAuthorizationHeader;
     }
     if (_apiKeyHeader.trim().isNotEmpty) {
       headers['x-api-key'] = _apiKeyHeader.trim();
@@ -60,7 +67,7 @@ class NotesApiClient {
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       final detail = (data is Map<String, dynamic>) ? data['detail'] : null;
-      if (response.statusCode == 401 && _authorizationHeader.trim().isEmpty) {
+      if (response.statusCode == 401 && effectiveAuthorizationHeader.isEmpty) {
         throw Exception(
           'API 401 unauthorized. Set LET_NOTES_API_AUTH_HEADER (for example: Bearer <token>).',
         );
@@ -83,6 +90,34 @@ class NotesApiClient {
         'password': password,
       },
     )) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> createApiKey({
+    required String email,
+    required String password,
+    String? name,
+  }) async {
+    final payload = <String, dynamic>{
+      'email': email,
+      'password': password,
+    };
+    if (name != null && name.trim().isNotEmpty) {
+      payload['name'] = name.trim();
+    }
+
+    try {
+      return (await _request(
+        'POST',
+        '/users/api-keys',
+        body: payload,
+      )) as Map<String, dynamic>;
+    } catch (_) {
+      return (await _request(
+        'POST',
+        '/api/users/api-keys',
+        body: payload,
+      )) as Map<String, dynamic>;
+    }
   }
 
   Future<List<Map<String, dynamic>>> getAllNotes({
