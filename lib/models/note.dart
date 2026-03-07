@@ -1,5 +1,8 @@
 class Note {
+  static const defaultTenantId = 'local_default_tenant';
+
   final String id;
+  final String tenantId;
   final String title;
   final String content;
   final DateTime createdAt;
@@ -9,6 +12,7 @@ class Note {
 
   Note({
     required this.id,
+    this.tenantId = defaultTenantId,
     required this.title,
     required this.content,
     required this.createdAt,
@@ -20,6 +24,7 @@ class Note {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
+      'tenant_id': tenantId,
       'title': title,
       'content': content,
       'createdAt': createdAt.toIso8601String(),
@@ -31,6 +36,7 @@ class Note {
   factory Note.fromMap(Map<String, dynamic> map, {List<String> labels = const []}) {
     return Note(
       id: map['id'],
+      tenantId: map['tenant_id'] ?? defaultTenantId,
       title: map['title'],
       content: map['content'],
       createdAt: DateTime.parse(map['createdAt']),
@@ -42,6 +48,7 @@ class Note {
 
   Note copyWith({
     String? id,
+    String? tenantId,
     String? title,
     String? content,
     DateTime? createdAt,
@@ -51,6 +58,7 @@ class Note {
   }) {
     return Note(
       id: id ?? this.id,
+      tenantId: tenantId ?? this.tenantId,
       title: title ?? this.title,
       content: content ?? this.content,
       createdAt: createdAt ?? this.createdAt,

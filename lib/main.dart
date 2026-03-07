@@ -150,6 +150,7 @@ class _NotesScreenState extends State<NotesScreen> {
         onPressed: () async {
           final newNote = Note(
             id: const Uuid().v4(),
+            tenantId: DatabaseHelper.instance.tenantId,
             title: '',
             content: '',
             createdAt: DateTime.now(),
