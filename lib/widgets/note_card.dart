@@ -12,15 +12,27 @@ class NoteCard extends StatelessWidget {
     this.onTap,
   }) : super(key: key);
 
+  bool _useDarkForeground(Color background) {
+    // Dark foreground text/icons for light note colors, light foreground for dark colors.
+    return background.computeLuminance() > 0.5;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final noteColor = Color(note.color);
+    final useDarkForeground = _useDarkForeground(noteColor);
+    final primaryTextColor = useDarkForeground ? Colors.black : Colors.white;
+    final secondaryTextColor = useDarkForeground ? Colors.black87 : Colors.white70;
+    final chipBgColor = useDarkForeground ? Colors.black.withOpacity(0.06) : Colors.white.withOpacity(0.14);
+    final chipBorderColor = useDarkForeground ? Colors.black.withOpacity(0.12) : Colors.white.withOpacity(0.28);
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(color: Colors.grey.shade300, width: 1),
       ),
-      color: Color(note.color),
+      color: noteColor,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
@@ -46,9 +58,10 @@ class NoteCard extends StatelessWidget {
                   if (note.title.isNotEmpty)
                 Text(
                   note.title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
+                    color: primaryTextColor,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -58,9 +71,9 @@ class NoteCard extends StatelessWidget {
               if (note.content.isNotEmpty)
                     Text(
                       note.content,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                        color: Colors.black87,
+                        color: secondaryTextColor,
                       ),
                       maxLines: 8,
                       overflow: TextOverflow.ellipsis,
@@ -73,13 +86,17 @@ class NoteCard extends StatelessWidget {
                       children: note.labels.map((label) => Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.05),
+                          color: chipBgColor,
                           borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: Colors.black.withOpacity(0.1)),
+                          border: Border.all(color: chipBorderColor),
                         ),
                         child: Text(
                           label,
-                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: primaryTextColor,
+                          ),
                         ),
                       )).toList(),
                     ),

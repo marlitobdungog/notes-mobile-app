@@ -21,18 +21,53 @@ class NoteDetailScreen extends StatefulWidget {
 }
 
 class _NoteDetailScreenState extends State<NoteDetailScreen> {
+  static const List<int> _lightNoteColors = [
+    0xFFFFFFFF, // White
+    0xFFF28B82, // Red
+    0xFFFBBC04, // Orange
+    0xFFFFF475, // Yellow
+    0xFFCCFF90, // Green
+    0xFFA7FFEB, // Teal
+    0xFFCBF0F8, // Blue
+    0xFFAECBFA, // Dark Blue
+    0xFFD7AEFB, // Purple
+    0xFFFDCFE8, // Pink
+  ];
+
+  static const List<int> _darkNoteColors = [
+    0xFF202124, // Default dark
+    0xFF5C2B29, // Red
+    0xFF614A19, // Orange
+    0xFF635D19, // Yellow
+    0xFF345920, // Green
+    0xFF16504B, // Teal
+    0xFF2D555E, // Blue
+    0xFF1E3A5F, // Dark Blue
+    0xFF42275E, // Purple
+    0xFF5B2245, // Pink
+  ];
+
   late TextEditingController _titleController;
   late TextEditingController _contentController;
+  late FocusNode _titleFocusNode;
+  late FocusNode _contentFocusNode;
   bool _isDeleting = false;
   late int _color;
   String? _imagePath;
   late List<String> _labels;
+
+  bool get _useDarkForeground => Color(_color).computeLuminance() > 0.5;
+  Color get _primaryTextColor => _useDarkForeground ? Colors.black : Colors.white;
+  Color get _secondaryTextColor => _useDarkForeground ? Colors.black87 : Colors.white70;
+  Color get _iconColor => _useDarkForeground ? Colors.black87 : Colors.white;
 
   @override
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.note.title);
     _contentController = TextEditingController(text: widget.note.content);
+    _titleFocusNode = FocusNode();
+    _contentFocusNode = FocusNode();
     _color = widget.note.color;
     _imagePath = widget.note.imagePath;
     _labels = List.from(widget.note.labels);
@@ -42,6 +77,8 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
   void dispose() {
     _titleController.dispose();
     _contentController.dispose();
+    _titleFocusNode.dispose();
+    _contentFocusNode.dispose();
     super.dispose();
   }
 
@@ -99,6 +136,9 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
   }
 
   void _showColorPicker() {
+    final isDarkTheme = Theme.of(context).brightness == Brightness.dark;
+    final colorOptions = isDarkTheme ? _darkNoteColors : _lightNoteColors;
+
     showModalBottomSheet(
       context: context,
       builder: (context) {
@@ -107,18 +147,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
           padding: const EdgeInsets.all(8.0),
           child: ListView(
             scrollDirection: Axis.horizontal,
-            children: [
-              _colorOption(0xFFFFFFFF), // White
-              _colorOption(0xFFF28B82), // Red
-              _colorOption(0xFFFBBC04), // Orange
-              _colorOption(0xFFFFF475), // Yellow
-              _colorOption(0xFFCCFF90), // Green
-              _colorOption(0xFFA7FFEB), // Teal
-              _colorOption(0xFFCBF0F8), // Blue
-              _colorOption(0xFFAECBFA), // Dark Blue
-              _colorOption(0xFFD7AEFB), // Purple
-              _colorOption(0xFFFDCFE8), // Pink
-            ],
+            children: colorOptions.map(_colorOption).toList(),
           ),
         );
       },
@@ -126,6 +155,9 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
   }
 
   Widget _colorOption(int colorValue) {
+    final color = Color(colorValue);
+    final iconColor = color.computeLuminance() > 0.5 ? Colors.black : Colors.white;
+
     return GestureDetector(
       onTap: () {
         setState(() => _color = colorValue);
@@ -136,11 +168,11 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
         height: 50,
         margin: const EdgeInsets.all(8.0),
         decoration: BoxDecoration(
-          color: Color(colorValue),
+          color: color,
           shape: BoxShape.circle,
           border: Border.all(color: Colors.grey.shade300),
         ),
-        child: _color == colorValue ? const Icon(Icons.check) : null,
+        child: _color == colorValue ? Icon(Icons.check, color: iconColor) : null,
       ),
     );
   }
@@ -238,16 +270,19 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           actions: [
-            IconButton(icon: const Icon(Icons.push_pin_outlined), onPressed: () {}),
-            IconButton(icon: const Icon(Icons.notifications_none_outlined), onPressed: () {}),
-            IconButton(icon: const Icon(Icons.archive_outlined), onPressed: () {}),
+            IconButton(icon: Icon(Icons.push_pin_outlined, color: _iconColor), onPressed: () {}),
+            IconButton(icon: Icon(Icons.notifications_none_outlined, color: _iconColor), onPressed: () {}),
+            IconButton(icon: Icon(Icons.archive_outlined, color: _iconColor), onPressed: () {}),
           ],
         ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        body: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: () => FocusScope.of(context).requestFocus(_contentFocusNode),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
               if (_imagePath != null)
                 Stack(
                   children: [
@@ -270,12 +305,15 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
               const SizedBox(height: 16),
               TextField(
                 controller: _titleController,
-                style: const TextStyle(
+                focusNode: _titleFocusNode,
+                style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
+                  color: _primaryTextColor,
                 ),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: 'Title',
+                  hintStyle: TextStyle(color: _secondaryTextColor),
                   border: InputBorder.none,
                 ),
                 maxLines: null,
@@ -283,9 +321,11 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
               const SizedBox(height: 8),
               TextField(
                 controller: _contentController,
-                style: const TextStyle(fontSize: 18),
-                decoration: const InputDecoration(
+                focusNode: _contentFocusNode,
+                style: TextStyle(fontSize: 18, color: _primaryTextColor),
+                decoration: InputDecoration(
                   hintText: 'Note',
+                  hintStyle: TextStyle(color: _secondaryTextColor),
                   border: InputBorder.none,
                 ),
                 maxLines: null,
@@ -295,11 +335,13 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
               Wrap(
                 spacing: 8,
                 children: _labels.map((label) => Chip(
-                  label: Text(label),
+                  label: Text(label, style: TextStyle(color: _primaryTextColor)),
+                  backgroundColor: _useDarkForeground ? Colors.black.withOpacity(0.08) : Colors.white.withOpacity(0.16),
                   onDeleted: () => setState(() => _labels.remove(label)),
                 )).toList(),
               ),
-            ],
+              ],
+            ),
           ),
         ),
         bottomNavigationBar: BottomAppBar(
@@ -316,7 +358,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
               const Spacer(),
               Text(
                 'Edited ${widget.note.createdAt.hour}:${widget.note.createdAt.minute.toString().padLeft(2, '0')}',
-                style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+                style: TextStyle(color: _secondaryTextColor, fontSize: 12),
               ),
               const Spacer(),
               PopupMenuButton<String>(

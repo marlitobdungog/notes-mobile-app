@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'models/note.dart';
 import 'widgets/note_card.dart';
@@ -10,31 +11,83 @@ void main() {
   runApp(const KeepCloneApp());
 }
 
-class KeepCloneApp extends StatelessWidget {
+class KeepCloneApp extends StatefulWidget {
   const KeepCloneApp({Key? key}) : super(key: key);
+
+  @override
+  State<KeepCloneApp> createState() => _KeepCloneAppState();
+}
+
+class _KeepCloneAppState extends State<KeepCloneApp> {
+  static const String _themeModePrefKey = 'theme_mode';
+  ThemeMode _themeMode = ThemeMode.light;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadThemeMode();
+  }
+
+  Future<void> _loadThemeMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    final storedValue = prefs.getString(_themeModePrefKey);
+    if (!mounted) return;
+    setState(() {
+      _themeMode = storedValue == 'dark' ? ThemeMode.dark : ThemeMode.light;
+    });
+  }
+
+  Future<void> _setDarkMode(bool enabled) async {
+    final nextMode = enabled ? ThemeMode.dark : ThemeMode.light;
+    setState(() {
+      _themeMode = nextMode;
+    });
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_themeModePrefKey, enabled ? 'dark' : 'light');
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Keep Clone',
+      themeMode: _themeMode,
       theme: ThemeData(
-        primarySwatch: Colors.blue,
         useMaterial3: true,
-        scaffoldBackgroundColor: Colors.white,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
       ),
-      home: const NotesScreen(),
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.blue,
+          brightness: Brightness.dark,
+        ),
+      ),
+      home: NotesScreen(
+        isDarkMode: _themeMode == ThemeMode.dark,
+        onThemeModeChanged: _setDarkMode,
+      ),
     );
   }
 }
 
 class NotesScreen extends StatefulWidget {
-  const NotesScreen({Key? key}) : super(key: key);
+  final bool isDarkMode;
+  final ValueChanged<bool> onThemeModeChanged;
+
+  const NotesScreen({
+    Key? key,
+    required this.isDarkMode,
+    required this.onThemeModeChanged,
+  }) : super(key: key);
 
   @override
   State<NotesScreen> createState() => _NotesScreenState();
 }
 
 class _NotesScreenState extends State<NotesScreen> {
+  static const int _lightDefaultNoteColor = 0xFFFFFFFF;
+  static const int _darkDefaultNoteColor = 0xFF202124;
+
   List<Note> _notes = [];
   List<String> _labels = [];
   String? _selectedLabel;
@@ -98,6 +151,12 @@ class _NotesScreenState extends State<NotesScreen> {
                 Navigator.pop(context);
               },
             ),
+            SwitchListTile(
+              secondary: const Icon(Icons.dark_mode_outlined),
+              title: const Text('Dark mode'),
+              value: widget.isDarkMode,
+              onChanged: widget.onThemeModeChanged,
+            ),
             const Divider(),
             const Padding(
               padding: EdgeInsets.only(left: 16.0, top: 8.0, bottom: 8.0),
@@ -154,6 +213,7 @@ class _NotesScreenState extends State<NotesScreen> {
             title: '',
             content: '',
             createdAt: DateTime.now(),
+            color: widget.isDarkMode ? _darkDefaultNoteColor : _lightDefaultNoteColor,
           );
           await Navigator.push(
             context,
