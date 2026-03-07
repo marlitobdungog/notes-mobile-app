@@ -1,7 +1,7 @@
 import '../models/note.dart';
 
 class NoteApiMapper {
-  static const Map<String, int> _apiToMobileColor = {
+  static const Map<String, int> _apiToLightMobileColor = {
     'note-gray': 0xFFFFFFFF,
     'note-red': 0xFFF28B82,
     'note-orange': 0xFFFBBC04,
@@ -14,8 +14,22 @@ class NoteApiMapper {
     'note-pink': 0xFFFDCFE8,
   };
 
+  static const Map<String, int> _apiToDarkMobileColor = {
+    'note-gray': 0xFF202124,
+    'note-red': 0xFF5C2B29,
+    'note-orange': 0xFF614A19,
+    'note-yellow': 0xFF635D19,
+    'note-green': 0xFF345920,
+    'note-teal': 0xFF16504B,
+    'note-blue': 0xFF2D555E,
+    'note-dark-blue': 0xFF1E3A5F,
+    'note-purple': 0xFF42275E,
+    'note-pink': 0xFF5B2245,
+  };
+
   static final Map<int, String> _mobileToApiColor = {
-    for (final entry in _apiToMobileColor.entries) entry.value: entry.key,
+    for (final entry in _apiToLightMobileColor.entries) entry.value: entry.key,
+    for (final entry in _apiToDarkMobileColor.entries) entry.value: entry.key,
   };
 
   static Note fromApi(
@@ -31,9 +45,9 @@ class NoteApiMapper {
     final fallbackId = json['id']?.toString() ?? NoteIdGenerator.generatePublicId();
     final createdAtString = json['updated_at'] as String? ?? json['created_at'] as String?;
     final apiColor = (json['color'] as String?) ?? 'note-gray';
-    final resolvedColor = preferDarkDefault && apiColor == 'note-gray'
-        ? 0xFF202124
-        : (_apiToMobileColor[apiColor] ?? 0xFFFFFFFF);
+    final palette = preferDarkDefault ? _apiToDarkMobileColor : _apiToLightMobileColor;
+    final resolvedColor = palette[apiColor] ??
+        (preferDarkDefault ? 0xFF202124 : 0xFFFFFFFF);
     final jsonUserId = (json['user_id'] is int)
         ? json['user_id'] as int
         : int.tryParse(json['user_id']?.toString() ?? '');

@@ -419,6 +419,49 @@ class DatabaseHelper {
     });
   }
 
+  Future<void> ensureLabelExists(String name, {int? userId}) async {
+    final normalizedName = name.trim();
+    if (normalizedName.isEmpty) return;
+
+    final db = await instance.database;
+    final activeUserId = _resolveUserId(userId);
+    await db.insert(
+      'labels',
+      {
+        'id': const Uuid().v4(),
+        'user_id': activeUserId,
+        'name': normalizedName,
+      },
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
+  }
+
+  Future<void> reconcileLabelsToRemote(List<String> remoteLabelNames, {int? userId}) async {
+    final db = await instance.database;
+    final activeUserId = _resolveUserId(userId);
+    final normalized = remoteLabelNames
+        .map((name) => name.trim())
+        .where((name) => name.isNotEmpty)
+        .toSet()
+        .toList();
+
+    if (normalized.isEmpty) {
+      await db.delete(
+        'labels',
+        where: 'user_id = ?',
+        whereArgs: [activeUserId],
+      );
+      return;
+    }
+
+    final placeholders = List.filled(normalized.length, '?').join(',');
+    await db.delete(
+      'labels',
+      where: 'user_id = ? AND name NOT IN ($placeholders)',
+      whereArgs: [activeUserId, ...normalized],
+    );
+  }
+
   Future<void> renameLabel(
     String oldName,
     String newName, {

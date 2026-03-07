@@ -44,12 +44,25 @@ class NoteSyncService {
     return _apiClient.getAllNotes(userId: userId);
   }
 
+  Future<List<String>> _pullLabelsFromRemote(int userId) async {
+    final remoteLabels = await _apiClient.getLabels(userId: userId);
+    final names = <String>[];
+    for (final label in remoteLabels) {
+      final name = (label['name'] as String?)?.trim();
+      if (name == null || name.isEmpty) continue;
+      names.add(name);
+      await DatabaseHelper.instance.ensureLabelExists(name, userId: userId);
+    }
+    return names;
+  }
+
   Future<int> pullFromRemote({
     int? userId,
     bool preferDarkDefault = false,
   }) async {
     final activeUserId = _resolveUserId(userId);
     debugPrint('Pulling notes from API for user_id=$activeUserId');
+    final remoteLabelNames = await _pullLabelsFromRemote(activeUserId);
     final remoteNotes = await _remoteNotes(activeUserId);
     debugPrint('API returned ${remoteNotes.length} notes for user_id=$activeUserId');
     var upserted = 0;
@@ -63,6 +76,10 @@ class NoteSyncService {
       await DatabaseHelper.instance.insertNote(local, userId: activeUserId);
       upserted++;
     }
+    await DatabaseHelper.instance.reconcileLabelsToRemote(
+      remoteLabelNames,
+      userId: activeUserId,
+    );
 
     return upserted;
   }
