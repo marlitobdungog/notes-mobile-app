@@ -93,6 +93,7 @@ class _KeepCloneAppState extends State<KeepCloneApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Keep Clone',
+      debugShowCheckedModeBanner: false,
       themeMode: _themeMode,
       theme: ThemeData(
         useMaterial3: true,

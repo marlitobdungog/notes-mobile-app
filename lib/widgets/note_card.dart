@@ -43,75 +43,96 @@ class NoteCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
           children: [
-            if (note.imagePath != null)
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-                child: Image.file(
-                  File(note.imagePath!),
-                  width: double.infinity,
-                  height: 100,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (note.title.isNotEmpty)
-                      Text(
-                        note.title,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: primaryTextColor,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    if (note.title.isNotEmpty && note.content.isNotEmpty) const SizedBox(height: 8),
-                    if (note.content.isNotEmpty)
-                      Flexible(
-                        child: Text(
-                          note.content,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: secondaryTextColor,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (note.imagePath != null)
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                    child: Image.file(
+                      File(note.imagePath!),
+                      width: double.infinity,
+                      height: 100,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (note.title.isNotEmpty)
+                          Text(
+                            note.title,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: primaryTextColor,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 8,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    if (visibleLabels.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: chipBgColor,
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: chipBorderColor),
-                        ),
-                        child: Text(
-                          labelSummary,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
-                            color: primaryTextColor,
+                        if (note.title.isNotEmpty && note.content.isNotEmpty) const SizedBox(height: 8),
+                        if (note.content.isNotEmpty)
+                          Flexible(
+                            child: Text(
+                              note.content,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: secondaryTextColor,
+                              ),
+                              maxLines: 8,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ],
+                        if (visibleLabels.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: chipBgColor,
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: chipBorderColor),
+                            ),
+                            child: Text(
+                              labelSummary,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                color: primaryTextColor,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
+            if (note.pinned)
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: useDarkForeground ? Colors.black.withOpacity(0.18) : Colors.white.withOpacity(0.6),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Icon(
+                    Icons.push_pin,
+                    size: 14,
+                    color: primaryTextColor,
+                  ),
+                ),
+              ),
           ],
         ),
       ),

@@ -45,6 +45,7 @@ class NoteApiMapper {
       content: (json['content'] as String?) ?? '',
       createdAt: createdAtString != null ? DateTime.parse(createdAtString).toLocal() : DateTime.now(),
       color: resolvedColor,
+      pinned: json['pinned'] == true,
       labels: labels,
     );
   }
@@ -59,7 +60,7 @@ class NoteApiMapper {
       'title': note.title,
       'content': note.content,
       'color': _mobileToApiColor[note.color] ?? 'note-gray',
-      'pinned': false,
+      'pinned': note.pinned,
       'archived': false,
       'label_ids': note.labels
           .map((name) => labelIdByName[name])
@@ -76,6 +77,7 @@ class NoteApiMapper {
       'title': note.title,
       'content': note.content,
       'color': _mobileToApiColor[note.color] ?? 'note-gray',
+      'pinned': note.pinned,
       'label_ids': note.labels
           .map((name) => labelIdByName[name])
           .whereType<int>()

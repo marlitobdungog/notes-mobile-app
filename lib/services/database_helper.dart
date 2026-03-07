@@ -33,7 +33,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 4,
+      version: 5,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
@@ -51,6 +51,7 @@ class DatabaseHelper {
         content TEXT,
         createdAt TEXT,
         color INTEGER,
+        pinned INTEGER NOT NULL DEFAULT 0,
         imagePath TEXT
       )
     ''');
@@ -178,6 +179,10 @@ class DatabaseHelper {
       await db.execute('DROP TABLE note_labels_old');
       await db.execute('CREATE INDEX IF NOT EXISTS idx_note_labels_user_note ON note_labels(user_id, note_id)');
     }
+
+    if (oldVersion < 5) {
+      await db.execute('ALTER TABLE notes ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0');
+    }
   }
 
   int _resolveUserId([int? userId, int? fallbackUserId]) {
@@ -207,7 +212,7 @@ class DatabaseHelper {
       'notes',
       where: 'user_id = ?',
       whereArgs: [activeUserId],
-      orderBy: 'createdAt DESC',
+      orderBy: 'pinned DESC, createdAt DESC',
     );
 
     List<Note> notes = [];

@@ -54,6 +54,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
   late FocusNode _titleFocusNode;
   late FocusNode _contentFocusNode;
   bool _isDeleting = false;
+  late bool _isPinned;
   late int _color;
   String? _imagePath;
   late List<String> _labels;
@@ -70,6 +71,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
     _contentController = TextEditingController(text: widget.note.content);
     _titleFocusNode = FocusNode();
     _contentFocusNode = FocusNode();
+    _isPinned = widget.note.pinned;
     _color = widget.note.color;
     _imagePath = widget.note.imagePath;
     _labels = List.from(widget.note.labels);
@@ -103,6 +105,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
       content: content,
       createdAt: DateTime.now(),
       color: _color,
+      pinned: _isPinned,
       imagePath: _imagePath,
       labels: _labels,
     );
@@ -275,7 +278,10 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           actions: [
-            IconButton(icon: Icon(Icons.push_pin_outlined, color: _iconColor), onPressed: () {}),
+            IconButton(
+              icon: Icon(_isPinned ? Icons.push_pin : Icons.push_pin_outlined, color: _iconColor),
+              onPressed: () => setState(() => _isPinned = !_isPinned),
+            ),
             IconButton(icon: Icon(Icons.notifications_none_outlined, color: _iconColor), onPressed: () {}),
             IconButton(icon: Icon(Icons.archive_outlined, color: _iconColor), onPressed: () {}),
           ],
