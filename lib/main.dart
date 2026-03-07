@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
 import 'models/note.dart';
 import 'widgets/note_card.dart';
 import 'screens/note_detail_screen.dart';
 import 'services/database_helper.dart';
+import 'services/note_sync_service.dart';
+import 'services/notes_api_client.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,12 +21,15 @@ class KeepCloneApp extends StatefulWidget {
 
 class _KeepCloneAppState extends State<KeepCloneApp> {
   static const String _themeModePrefKey = 'theme_mode';
+  static const String _userIdPrefKey = 'user_id';
   ThemeMode _themeMode = ThemeMode.light;
+  int? _currentUserId;
 
   @override
   void initState() {
     super.initState();
     _loadThemeMode();
+    _loadUserSession();
   }
 
   Future<void> _loadThemeMode() async {
@@ -46,6 +50,38 @@ class _KeepCloneAppState extends State<KeepCloneApp> {
     await prefs.setString(_themeModePrefKey, enabled ? 'dark' : 'light');
   }
 
+  Future<void> _loadUserSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getInt(_userIdPrefKey);
+    if (userId != null && userId > 0) {
+      DatabaseHelper.instance.setUserId(userId);
+    }
+    if (!mounted) return;
+    setState(() {
+      _currentUserId = userId;
+    });
+  }
+
+  Future<void> _onLoginSuccess(int userId) async {
+    DatabaseHelper.instance.setUserId(userId);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_userIdPrefKey, userId);
+    if (!mounted) return;
+    setState(() {
+      _currentUserId = userId;
+    });
+  }
+
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_userIdPrefKey);
+    DatabaseHelper.instance.setUserId(Note.defaultUserId);
+    if (!mounted) return;
+    setState(() {
+      _currentUserId = null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -62,10 +98,13 @@ class _KeepCloneAppState extends State<KeepCloneApp> {
           brightness: Brightness.dark,
         ),
       ),
-      home: NotesScreen(
-        isDarkMode: _themeMode == ThemeMode.dark,
-        onThemeModeChanged: _setDarkMode,
-      ),
+      home: _currentUserId == null
+          ? LoginScreen(onLoginSuccess: _onLoginSuccess)
+          : NotesScreen(
+              isDarkMode: _themeMode == ThemeMode.dark,
+              onThemeModeChanged: _setDarkMode,
+              onLogout: _logout,
+            ),
     );
   }
 }
@@ -73,11 +112,13 @@ class _KeepCloneAppState extends State<KeepCloneApp> {
 class NotesScreen extends StatefulWidget {
   final bool isDarkMode;
   final ValueChanged<bool> onThemeModeChanged;
+  final Future<void> Function() onLogout;
 
   const NotesScreen({
     Key? key,
     required this.isDarkMode,
     required this.onThemeModeChanged,
+    required this.onLogout,
   }) : super(key: key);
 
   @override
@@ -92,22 +133,62 @@ class _NotesScreenState extends State<NotesScreen> {
   List<String> _labels = [];
   String? _selectedLabel;
   bool _isLoading = true;
+  bool _isSyncing = false;
+  String? _syncError;
 
   @override
   void initState() {
     super.initState();
-    _refreshNotes();
+    _refreshNotes(syncRemote: true);
   }
 
-  Future<void> _refreshNotes() async {
+  Future<void> _refreshNotes({bool syncRemote = false}) async {
     setState(() => _isLoading = true);
+    if (syncRemote) {
+      setState(() => _isSyncing = true);
+      try {
+        final count = await NoteSyncService.instance.pullWithResult();
+        debugPrint('Initial sync completed: $count notes pulled');
+        _syncError = null;
+      } catch (e) {
+        _syncError = e.toString().replaceFirst('Exception: ', '');
+        debugPrint('Initial sync failed: $_syncError');
+      }
+      if (mounted) {
+        setState(() => _isSyncing = false);
+      }
+    }
     final notes = await DatabaseHelper.instance.getAllNotes();
     final labels = await DatabaseHelper.instance.getAllLabels();
+    if (!mounted) return;
     setState(() {
       _notes = notes;
       _labels = labels;
       _isLoading = false;
     });
+  }
+
+  Future<void> _syncNow() async {
+    setState(() => _isSyncing = true);
+    try {
+      final count = await NoteSyncService.instance.pullWithResult();
+      _syncError = null;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Synced $count notes from API')),
+        );
+      }
+    } catch (e) {
+      _syncError = e.toString().replaceFirst('Exception: ', '');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Sync failed: $_syncError')),
+        );
+      }
+    }
+    if (!mounted) return;
+    setState(() => _isSyncing = false);
+    await _refreshNotes();
   }
 
   List<Note> get _filteredNotes {
@@ -128,6 +209,16 @@ class _NotesScreenState extends State<NotesScreen> {
           IconButton(
             icon: const Icon(Icons.view_agenda_outlined),
             onPressed: () {},
+          ),
+          IconButton(
+            icon: _isSyncing
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.sync),
+            onPressed: _isSyncing ? null : _syncNow,
           ),
         ],
       ),
@@ -157,6 +248,14 @@ class _NotesScreenState extends State<NotesScreen> {
               value: widget.isDarkMode,
               onChanged: widget.onThemeModeChanged,
             ),
+            ListTile(
+              leading: const Icon(Icons.logout),
+              title: const Text('Logout'),
+              onTap: () async {
+                Navigator.pop(context);
+                await widget.onLogout();
+              },
+            ),
             const Divider(),
             const Padding(
               padding: EdgeInsets.only(left: 16.0, top: 8.0, bottom: 8.0),
@@ -177,7 +276,13 @@ class _NotesScreenState extends State<NotesScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _filteredNotes.isEmpty
-              ? Center(child: Text(_selectedLabel == null ? 'No notes yet' : 'No notes with this label'))
+              ? Center(
+                  child: Text(
+                    _syncError != null
+                        ? 'Sync error: $_syncError'
+                        : (_selectedLabel == null ? 'No notes yet' : 'No notes with this label'),
+                  ),
+                )
               : Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: GridView.builder(
@@ -208,8 +313,8 @@ class _NotesScreenState extends State<NotesScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           final newNote = Note(
-            id: const Uuid().v4(),
-            tenantId: DatabaseHelper.instance.tenantId,
+            id: NoteIdGenerator.generatePublicId(),
+            userId: DatabaseHelper.instance.userId,
             title: '',
             content: '',
             createdAt: DateTime.now(),
@@ -238,6 +343,112 @@ class _NotesScreenState extends State<NotesScreen> {
             IconButton(icon: const Icon(Icons.brush_outlined), onPressed: () {}),
             IconButton(icon: const Icon(Icons.mic_none_outlined), onPressed: () {}),
             IconButton(icon: const Icon(Icons.image_outlined), onPressed: () {}),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class LoginScreen extends StatefulWidget {
+  final Future<void> Function(int userId) onLoginSuccess;
+
+  const LoginScreen({
+    Key? key,
+    required this.onLoginSuccess,
+  }) : super(key: key);
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _isLoading = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _login() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      setState(() => _error = 'Email and password are required');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final client = NotesApiClient(
+        baseUrl: const String.fromEnvironment(
+          'LET_NOTES_API_URL',
+          defaultValue: NotesApiClient.defaultBaseUrl,
+        ),
+      );
+      final user = await client.loginUser(email: email, password: password);
+      final userId = user['id'] as int?;
+      if (userId == null || userId <= 0) {
+        throw Exception('Invalid login response');
+      }
+      await widget.onLoginSuccess(userId);
+    } catch (e) {
+      setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Login')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            TextField(
+              controller: _emailController,
+              decoration: const InputDecoration(labelText: 'Email'),
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _passwordController,
+              decoration: const InputDecoration(labelText: 'Password'),
+              obscureText: true,
+            ),
+            const SizedBox(height: 16),
+            if (_error != null) ...[
+              Text(_error!, style: const TextStyle(color: Colors.red)),
+              const SizedBox(height: 8),
+            ],
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _login,
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Login'),
+              ),
+            ),
           ],
         ),
       ),

@@ -1,8 +1,10 @@
+import 'dart:math';
+
 class Note {
-  static const defaultTenantId = 'local_default_tenant';
+  static const defaultUserId = 1;
 
   final String id;
-  final String tenantId;
+  final int userId;
   final String title;
   final String content;
   final DateTime createdAt;
@@ -12,7 +14,7 @@ class Note {
 
   Note({
     required this.id,
-    this.tenantId = defaultTenantId,
+    this.userId = defaultUserId,
     required this.title,
     required this.content,
     required this.createdAt,
@@ -24,7 +26,7 @@ class Note {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'tenant_id': tenantId,
+      'user_id': userId,
       'title': title,
       'content': content,
       'createdAt': createdAt.toIso8601String(),
@@ -36,7 +38,9 @@ class Note {
   factory Note.fromMap(Map<String, dynamic> map, {List<String> labels = const []}) {
     return Note(
       id: map['id'],
-      tenantId: map['tenant_id'] ?? defaultTenantId,
+      userId: (map['user_id'] is int)
+          ? map['user_id'] as int
+          : int.tryParse(map['user_id']?.toString() ?? '') ?? defaultUserId,
       title: map['title'],
       content: map['content'],
       createdAt: DateTime.parse(map['createdAt']),
@@ -48,7 +52,7 @@ class Note {
 
   Note copyWith({
     String? id,
-    String? tenantId,
+    int? userId,
     String? title,
     String? content,
     DateTime? createdAt,
@@ -58,7 +62,7 @@ class Note {
   }) {
     return Note(
       id: id ?? this.id,
-      tenantId: tenantId ?? this.tenantId,
+      userId: userId ?? this.userId,
       title: title ?? this.title,
       content: content ?? this.content,
       createdAt: createdAt ?? this.createdAt,
@@ -66,5 +70,17 @@ class Note {
       imagePath: imagePath ?? this.imagePath,
       labels: labels ?? this.labels,
     );
+  }
+}
+
+class NoteIdGenerator {
+  static const _alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  static final Random _random = Random.secure();
+
+  static String generatePublicId({int length = 12}) {
+    return List.generate(
+      length,
+      (_) => _alphabet[_random.nextInt(_alphabet.length)],
+    ).join();
   }
 }

@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import '../models/note.dart';
 import '../services/database_helper.dart';
+import '../services/note_sync_service.dart';
 
 class NoteDetailScreen extends StatefulWidget {
   final Note note;
@@ -90,6 +91,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
 
     if (title.isEmpty && content.isEmpty) {
       if (!widget.isNew) {
+        await NoteSyncService.instance.safeDeleteRemoteByPublicId(widget.note.id);
         await DatabaseHelper.instance.deleteNote(widget.note.id);
       }
       return;
@@ -109,11 +111,13 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
     } else {
       await DatabaseHelper.instance.updateNote(note);
     }
+    await NoteSyncService.instance.safeUpsertRemote(note);
   }
 
   Future<void> _deleteNote() async {
     _isDeleting = true;
     if (!widget.isNew) {
+      await NoteSyncService.instance.safeDeleteRemoteByPublicId(widget.note.id);
       await DatabaseHelper.instance.deleteNote(widget.note.id);
     }
     if (mounted) {
